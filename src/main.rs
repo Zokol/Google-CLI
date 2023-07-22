@@ -31,12 +31,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let api_key = env::var("GOOGLE_API_KEY")?;
     let search_engine_id = env::var("SEARCH_ENGINE_ID")?;
 
-    // Here, for demonstration purposes, we'll just search for "rust programming".
-    let query = "rust programming";
+    // Get the search query from the command line arguments.
+    let args: Vec<String> = env::args().collect();
+    if args.len() < 2 {
+        return Err("Please provide a search term as an argument.".into());
+    }
+    let query = &args[1];
+
+    // URL encode the query to ensure it's properly formatted for an HTTP request.
+    let encoded_query = url::form_urlencoded::byte_serialize(query.as_bytes()).collect::<String>();
 
     let resp: GoogleSearchResult = reqwest::blocking::get(&format!(
         "{}?key={}&cx={}&q={}",
-        GOOGLE_API_URL, api_key, search_engine_id, query
+        GOOGLE_API_URL, api_key, search_engine_id, encoded_query
     ))?
     .json()?;
 
