@@ -2,64 +2,65 @@ use reqwest;
 use serde::{Deserialize, Serialize};
 use std::env;
 
-// Define the data structures we expect from Google Search API.
 #[derive(Debug, Deserialize)]
-struct GoogleSearchResult {
-    items: Vec<Item>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Item {
-    link: String,
+struct GoogleSearchItem {
     title: String,
+    link: String,
     snippet: String,
 }
 
-// This is what we will serialize to JSON as output.
-#[derive(Debug, Serialize)]
-struct SearchResult {
-    order: usize,
-    url: String,
-    title: String,
-    content_preview: String,
+#[derive(Debug, Deserialize)]
+struct GoogleSearchResult {
+    items: Vec<GoogleSearchItem>,
 }
 
-const GOOGLE_API_URL: &str = "https://www.googleapis.com/customsearch/v1";
+#[derive(Debug, Serialize)]
+struct SearchResult {
+    title: String,
+    link: String,
+    description: String,
+}
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Fetch your API key and search engine ID from environment variables.
-    let api_key = env::var("GOOGLE_API_KEY")?;
-    let search_engine_id = env::var("SEARCH_ENGINE_ID")?;
+const GOOGLE_SEARCH_API: &str = "https://www.googleapis.com/customsearch/v1";
 
-    // Get the search query from the command line arguments.
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Reading command line arguments
     let args: Vec<String> = env::args().collect();
+
     if args.len() < 2 {
-        return Err("Please provide a search term as an argument.".into());
+        eprintln!("Please provide a search phrase.");
+        std::process::exit(1);
     }
+
     let query = &args[1];
 
-    // URL encode the query to ensure it's properly formatted for an HTTP request.
-    let encoded_query = url::form_urlencoded::byte_serialize(query.as_bytes()).collect::<String>();
+    // Reading the environment variables
+    let api_key = env::var("GOOGLE_API_KEY").expect("GOOGLE_API_KEY not set");
+    let search_engine_id = env::var("SEARCH_ENGINE_ID").expect("SEARCH_ENGINE_ID not set");
 
-    let resp: GoogleSearchResult = reqwest::blocking::get(&format!(
-        "{}?key={}&cx={}&q={}",
-        GOOGLE_API_URL, api_key, search_engine_id, encoded_query
-    ))?
-    .json()?;
+    // Prepare the client and make a request
+    let client = reqwest::Client::new();
+    let response = client.get(GOOGLE_SEARCH_API)
+        .query(&[("key", &api_key), ("cx", &search_engine_id), ("q", query)])
+        .send()
+        .await?;
 
-    // Process results to create our custom SearchResult structs.
-    let search_results: Vec<SearchResult> = resp.items.iter().enumerate().map(|(index, item)| {
+    // Deserialize the response
+    let google_results: GoogleSearchResult = response.json().await?;
+
+    // Map Google's search results to our application's structure
+    let search_results: Vec<SearchResult> = google_results.items.into_iter().map(|item| {
         SearchResult {
-            order: index + 1,
-            url: item.link.clone(),
-            title: item.title.clone(),
-            content_preview: item.snippet.chars().take(100).collect(),
+            title: item.title,
+            link: item.link,
+            description: item.snippet,
         }
     }).collect();
 
-    // Serialize our search results to JSON.
-    let output = serde_json::to_string_pretty(&search_results)?;
-    println!("{}", output);
+    // Serialize our search results to JSON (pretty-printed)
+    let json_output = serde_json::to_string_pretty(&search_results)?;
+    println!("{}", json_output);
 
     Ok(())
 }
