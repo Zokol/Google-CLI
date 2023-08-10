@@ -6,7 +6,7 @@ use std::fs::File;
 use std::io::Write;
 use std::error::Error;
 use std::convert::From;
-use indicatif::{ProgressBar};
+use indicatif::ProgressBar;
 
 #[derive(Debug, Deserialize)]
 struct GoogleSearchItem {
