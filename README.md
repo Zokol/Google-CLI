@@ -64,4 +64,3 @@ If you'd like to contribute to the project, pull requests are very much apprecia
 
 [MIT](https://choosealicense.com/licenses/mit/)
 
->>>>>>> download
